@@ -1,0 +1,660 @@
+FROM registry.access.redhat.com/ubi9/ubi:9.0.0-1576
+#FROM registry.access.redhat.com/ubi9/ubi-minimal:9.0.0-1580
+
+ARG UDI_VERSION=20220704-1445
+
+ARG GCLOUD_VERSION=392.0.0
+ARG OC_VERSION=4.10.18
+ARG KREW_VERSION=0.4.3
+ARG ODO_VERSION=2.5.1
+ARG KUSTOMIZE_VERSION=4.5.5
+ARG TKNCLI_VERSION=0.24.0
+ARG KN_VERSION=1.5.0
+ARG HELM_VERSION=3.9.0
+ARG GH_VERSION=2.13.0
+ARG YQ_VERSION=4.25.3
+ARG ARGOCD_VAULT_PLUGIN_VERSION=1.11.0
+ARG TERRAFORM_VER=1.2.4
+ARG PS_VERSION=7.2.5
+ARG PSEDTSVC_VERSION=3.4.5
+ARG ROBOCONFIG_VERSION=0.27.2
+ARG RIPGREP_VERSION=13.0.0
+ARG BAT_VERSION=0.21.0
+ARG E2FSPROGS_VERSION=1.46.5
+ARG VAULT_VERSION=1.11.0
+ARG RCLONE_VERSION=1.58.1
+ARG LOMBOK_VERSION=1.18.24
+ARG KAMEL_VERSION=1.9.2
+ARG SHELLCHECK_VERSION=0.8.0
+ARG GO_VERSION=1.18.3
+ARG GO_SHA256SUM='956f8507b302ab0bb747613695cdae10af99bbd39a90cae522b7c0302cc27245'
+ARG NVM_VERSION=0.39.1
+
+ENV \
+    HOME=/home/user \
+    USER_NAME=user \
+    USER_UID=1001 \
+    SUMMARY="devfile universal developer image" \
+    DESCRIPTION="Image with developers tools, languages SDK and runtimes included." \
+    #PATH=/home/user/google-cloud-sdk/bin:/home/user/.local/bin:/home/user/node_modules/.bin/:/home/user/.npm-global/bin/:/opt/app-root/src/.npm-global/bin/:/home/user/.krew/bin:/home/user/.cargo/bin:/usr/local/PowerShellEditorServices:${PATH} \
+    PATH=/home/user/google-cloud-sdk/bin:/home/user/.local/bin:/home/user/.krew/bin:/home/user/.cargo/bin:${PATH} \
+    PYTHON_VERSION=3.9 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONIOENCODING=UTF-8 \
+    ##LC_ALL=en_US.UTF-8 \
+    ##LANG=en_US.UTF-8 \
+    #PIP_NO_CACHE_DIR=off \
+    # Instruct pip(env) not to keep a cache of installed packages,
+    # to install into the global site-packages and
+    # to clear the pipenv cache as well
+    PIP_NO_CACHE_DIR=1 \
+    PIPENV_SYSTEM=1 \
+    PIPENV_CLEAR=1 \
+    #PIPENV_VENV_IN_PROJECT=1 \
+    PIPENV_VERBOSITY=-1 \
+    RCLONE_CONFIG=/home/user/rclone.conf \
+    POWERSHELL_TELEMETRY_OPTOUT=true \
+    DOTNET_SKIP_FIRST_TIME_EXPERIENCE=true \
+    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
+    PSModuleAnalysisCachePath=/var/cache/microsoft/powershell/PSModuleAnalysisCache/ModuleAnalysisCache \
+    #GOPATH=/projects/.che/gopath \
+    CARGO_HOME=/home/user/.cargo \
+    RUSTUP_HOME=/home/user/.rustup \
+    ## https://techglimpse.com/error-loading-shared-libraries-libcrypto-so-1-1/
+    ## https://www.usessionbuddy.com/post/node-error-while-loading-shared-libraries-libbrotlidec.so.1-cannot-open-shared-object-file/
+    LD_LIBRARY_PATH="/usr/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" \
+    CPATH="/usr/include${CPATH:+:${CPATH}}" \
+    BUILDAH_ISOLATION=chroot \
+    _CONTAINERS_USERNS_CONFIGURED=""
+
+LABEL \
+    summary="$SUMMARY" \
+    description="$DESCRIPTION" \
+    io.k8s.description="$DESCRIPTION" \
+    io.k8s.display-name="devspaces/universal-developer-image" \
+    org.label-schema.version="$UDI_VERSION" \
+    org.label-schema.name="devspaces/universal-developer-image"
+
+COPY ./rootfs /
+
+RUN set -ex && \
+    #################################################################
+    # Define package dependecies
+    #################################################################
+    #(echo '[container-tools]'; echo 'name=container-tools'; echo 'stream=rhel9'; echo 'profiles='; echo 'state=enabled') > /etc/dnf/modules.d/container-tools.module && \
+    #dnf -y module enable container-tools:rhel9 && \
+    #dnf -y module enable python39:3.9 && \
+    PKGMGR='dnf' && \
+    #BUILDTIME_PKGS="gcc python3-devel libffi-devel openssl-devel" && \
+    BUILDTIME_PKGS="" && \
+    RUNTIME_PKGS=" \
+    # Developement Tools
+    bash diffutils git git-lfs iproute jq less lsof man \
+    procps-ng net-tools openssh-clients rsync socat sudo time \
+    vim wget tar gzip unzip xz bzip2 findutils which redhat-release \
+    redhat-rpm-config patch ca-certificates glibc-langpack-en \
+    coreutils-single nss_wrapper jq python3-devel libffi-devel \
+    openssl-devel \
+    # Container tools
+    shadow-utils skopeo buildah fuse-overlayfs podman \
+    # Python
+    openssh-clients python3-pip python3-setuptools python3 libicu \
+    python3-devel libgcc nss_wrapper \
+    # Golang
+    gettext make cmake autoconf automake gcc gcc-c++ glibc-devel \
+    zlib-devel libstdc++ libstdc++-devel \
+    # Dotnet
+    dotnet-sdk-6.0 \
+    # C/CPP
+    llvm-toolset gcc gcc-c++ clang clang-libs clang-tools-extra gdb \
+    # Required packages for AWT
+    libXext libXrender libXtst libXi \
+    " && \
+    #################################################################
+    # Install packages
+    #################################################################
+    #rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm && \
+    ${PKGMGR} \
+    --disablerepo='*' \
+    --enablerepo="ubi-9-baseos" \
+    --enablerepo="ubi-9-appstream" \
+    --enablerepo="ubi-9-codeready-builder" \
+    #--enablerepo="ubi-8-appstream" \
+    #--enablerepo="ubi-8-baseos" \
+    #--enablerepo="ubi-8-codeready-builder" \
+    #--enablerepo="centos-9-appstream" \
+    #--enablerepo="centos-9-baseos" \
+    #--enablerepo="epel" \
+    -y --setopt=tsflags=nodocs --setopt=install_weak_deps=0 \
+    --disableplugin=subscription-manager install \
+    ${BUILDTIME_PKGS} ${RUNTIME_PKGS} && \
+    ## https://bugzilla.redhat.com/show_bug.cgi?id=1994521 (curl)
+    ## https://www.usessionbuddy.com/post/node-error-while-loading-shared-libraries-libbrotlidec.so.1-cannot-open-shared-object-file/
+    dnf --setopt=tsflags=nodocs --setopt=install_weak_deps=0 \
+    --disableplugin=subscription-manager install -y --allowerasing libcurl-full && \
+    #################################################################
+    # Add user and group first to make sure their IDs get assigned
+    # consistently, regardless of whatever dependencies get added
+    ################################################################
+    ##echo "${USER_NAME}:x:${USER_UID}:0:${USER_NAME} User:${HOME}:/sbin/nologin" >> /etc/passwd && \
+    ##echo "${USER_NAME}:x:${USER_UID}:" >> /etc/group && \
+    ##echo "${USER_NAME}:!!:18770::::::" >> /etc/shadow && \
+    mkdir -p /projects /opt/app-root && \
+    groupadd -r ${USER_NAME} -g ${USER_UID} && \
+    useradd -u ${USER_UID} -g 0 -G wheel,root -d ${HOME} --shell /bin/bash  -c "Container user" -m ${USER_NAME} && \
+    ## https://developers.redhat.com/blog/2018/08/15/how-to-enable-sudo-on-rhel#using_sudo_without_a_password
+    chmod u+w /etc/sudoers && \
+    sed -i 's/^%wheel/#wheel/' /etc/sudoers && \
+    sed -i 's/# %wheel/%wheel/' /etc/sudoers && \
+    chmod u-w /etc/sudoers && \
+    # Change permissions to let any arbitrary user
+    chgrp -R 0 ${HOME} /etc/passwd /etc/group /projects /opt/app-root && \
+    chmod -R g+rwX ${HOME} /etc/passwd /etc/group /projects /opt/app-root && \
+    #################################################################
+    # user name recognition at runtime w/ an arbitrary uid
+    #################################################################
+    chown -R ${USER_UID}:0 ${HOME} && \
+    chgrp -R 0 ${HOME} && \
+    chmod -R 0775 ${HOME} && \
+    chmod 0664 /etc/passwd /etc/group && \
+    chmod g=u /etc/passwd /etc/group && \
+    ls -la /etc/passwd && ls -la /etc/group && \
+    #################################################################
+    # Allow OpenShift user update CA bundle
+    #################################################################
+    chgrp -R 0 /etc/ssl/certs && \
+    chmod -R g=u /etc/ssl/certs && \
+    mkdir -p /etc/pki/ca-trust/extracted && \
+    mkdir -p /etc/pki/ca-trust/source/anchors && \
+    chgrp -R 0 /etc/pki/ca-trust && \
+    chmod -R g=u /etc/pki/ca-trust && \
+    ##################################################################
+    ### install gcloud
+    ##################################################################
+    curl --progress-bar --location --fail --show-error \
+    --connect-timeout "${CURL_CONNECTION_TIMEOUT:-20}" \
+    --retry "${CURL_RETRY:-5}" \
+    --retry-delay "${CURL_RETRY_DELAY:-0}" \
+    --retry-max-time "${CURL_RETRY_MAX_TIME:-60}" \
+    --output - \
+    --url "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-${GCLOUD_VERSION}-linux-x86_64.tar.gz" | \
+    tar -zxf - --no-same-owner -C ${HOME} && \
+    #################################################################
+    # gcloud config
+    #################################################################
+    gcloud config set core/disable_usage_reporting true && \
+    gcloud config set component_manager/disable_update_check true && \
+    gcloud config set metrics/environment github_docker_image && \
+    gcloud config set survey/disable_prompts true && \
+    gcloud info && \
+    pip3 install --no-cache-dir -U crcmod && \
+    gsutil version -l && \
+    rm -rf ${HOME}/google-cloud-sdk/.install/.backup && \
+    rm -rf ${HOME}/.config/gcloud/logs && \
+    mkdir -p ${HOME}/.config && \
+    #################################################################
+    ## install camel-k
+    #################################################################
+    curl --progress-bar --location --fail --show-error \
+    --connect-timeout "${CURL_CONNECTION_TIMEOUT:-20}" \
+    --retry "${CURL_RETRY:-5}" \
+    --retry-delay "${CURL_RETRY_DELAY:-0}" \
+    --retry-max-time "${CURL_RETRY_MAX_TIME:-60}" \
+    --output - \
+    --url "https://github.com/apache/camel-k/releases/download/v${KAMEL_VERSION}/camel-k-client-${KAMEL_VERSION}-linux-64bit.tar.gz" | \
+    tar -zxf - --no-same-owner -C /usr/local/bin kamel && \
+    chmod 0755 /usr/local/bin/kamel && \
+    #################################################################
+    ## install shellcheck
+    #################################################################
+    curl --progress-bar --location --fail --show-error \
+    --connect-timeout "${CURL_CONNECTION_TIMEOUT:-20}" \
+    --retry "${CURL_RETRY:-5}" \
+    --retry-delay "${CURL_RETRY_DELAY:-0}" \
+    --retry-max-time "${CURL_RETRY_MAX_TIME:-60}" \
+    --output - \
+    --url "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" | \
+    tar -Jxf - --no-same-owner -C /bin --strip-components=1 shellcheck-v${SHELLCHECK_VERSION}/shellcheck && \
+    chmod 0755 /bin/shellcheck && \
+    #################################################################
+    ## install ripgrep
+    #################################################################
+    curl --progress-bar --location --fail --show-error \
+    --connect-timeout "${CURL_CONNECTION_TIMEOUT:-20}" \
+    --retry "${CURL_RETRY:-5}" \
+    --retry-delay "${CURL_RETRY_DELAY:-0}" \
+    --retry-max-time "${CURL_RETRY_MAX_TIME:-60}" \
+    --output - \
+    --url "https://github.com/BurntSushi/ripgrep/releases/download/${RIPGREP_VERSION}/ripgrep-${RIPGREP_VERSION}-x86_64-unknown-linux-musl.tar.gz" | \
+    tar -zxf - --no-same-owner -C /usr/local/bin --strip-components=1 ripgrep-${RIPGREP_VERSION}-x86_64-unknown-linux-musl/rg && \
+    chmod 0755 /usr/local/bin/rg && \
+    #################################################################
+    ## install bat
+    #################################################################
+    curl --progress-bar --location --fail --show-error \
+    --connect-timeout "${CURL_CONNECTION_TIMEOUT:-20}" \
+    --retry "${CURL_RETRY:-5}" \
+    --retry-delay "${CURL_RETRY_DELAY:-0}" \
+    --retry-max-time "${CURL_RETRY_MAX_TIME:-60}" \
+    --output - \
+    --url "https://github.com/sharkdp/bat/releases/download/v${BAT_VERSION}/bat-v${BAT_VERSION}-x86_64-unknown-linux-musl.tar.gz" | \
+    tar -zxf - --no-same-owner -C /usr/local/bin --strip-components=1 bat-v${BAT_VERSION}-x86_64-unknown-linux-musl/bat && \
+    chmod 0755 /usr/local/bin/bat && \
+    #################################################################
+    ## install oc
+    #################################################################
+    curl --progress-bar --location --fail --show-error \
+    --connect-timeout "${CURL_CONNECTION_TIMEOUT:-20}" \
+    --retry "${CURL_RETRY:-5}" \
+    --retry-delay "${CURL_RETRY_DELAY:-0}" \
+    --retry-max-time "${CURL_RETRY_MAX_TIME:-60}" \
+    --output - \
+    --url "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/${OC_VERSION}/openshift-client-linux-${OC_VERSION}.tar.gz" | \
+    tar -zxf - --no-same-owner -C /usr/local/bin oc kubectl && \
+    chmod 0755 /usr/local/bin/{oc,kubectl} && \
+    #################################################################
+    ## install krew
+    #################################################################
+    curl --progress-bar --location --fail --show-error \
+    --connect-timeout "${CURL_CONNECTION_TIMEOUT:-20}" \
+    --retry "${CURL_RETRY:-5}" \
+    --retry-delay "${CURL_RETRY_DELAY:-0}" \
+    --retry-max-time "${CURL_RETRY_MAX_TIME:-60}" \
+    --output - \
+    --url "https://github.com/kubernetes-sigs/krew/releases/download/v${KREW_VERSION}/krew-linux_amd64.tar.gz" | \
+    tar -zxf - --no-same-owner -C /tmp && \
+    chmod 0755 /tmp/krew-linux_amd64 && \
+    mkdir -p ${HOME}/.krew/bin && \
+    /tmp/krew-linux_amd64 install krew && \
+    rm -rf /tmp/krew-linux_amd64 && \
+    #################################################################
+    ## install kn
+    #################################################################
+    curl --progress-bar --location --fail --show-error \
+    --connect-timeout "${CURL_CONNECTION_TIMEOUT:-20}" \
+    --retry "${CURL_RETRY:-5}" \
+    --retry-delay "${CURL_RETRY_DELAY:-0}" \
+    --retry-max-time "${CURL_RETRY_MAX_TIME:-60}" \
+    --output /usr/local/bin/kn \
+    --url "https://github.com/knative/client/releases/download/knative-v${KN_VERSION}/kn-linux-amd64" && \
+    chmod 0755 /usr/local/bin/kn && \
+    #################################################################
+    ## install odo
+    #################################################################
+    curl --progress-bar --location --fail --show-error \
+    --connect-timeout "${CURL_CONNECTION_TIMEOUT:-20}" \
+    --retry "${CURL_RETRY:-5}" \
+    --retry-delay "${CURL_RETRY_DELAY:-0}" \
+    --retry-max-time "${CURL_RETRY_MAX_TIME:-60}" \
+    --output /usr/local/bin/odo \
+    --url "https://mirror.openshift.com/pub/openshift-v4/clients/odo/v${ODO_VERSION}/odo-linux-amd64" && \
+    chmod 0755 /usr/local/bin/odo && \
+    #################################################################
+    ## install skaffold
+    #################################################################
+    curl --progress-bar --location --fail --show-error \
+    --connect-timeout "${CURL_CONNECTION_TIMEOUT:-20}" \
+    --retry "${CURL_RETRY:-5}" \
+    --retry-delay "${CURL_RETRY_DELAY:-0}" \
+    --retry-max-time "${CURL_RETRY_MAX_TIME:-60}" \
+    --output /usr/local/bin/skaffold \
+    --url "https://storage.googleapis.com/skaffold/releases/latest/skaffold-linux-amd64" && \
+    chmod 0755 /usr/local/bin/skaffold && \
+    #################################################################
+    ## install helm
+    #################################################################
+    curl --progress-bar --location --fail --show-error \
+    --connect-timeout "${CURL_CONNECTION_TIMEOUT:-20}" \
+    --retry "${CURL_RETRY:-5}" \
+    --retry-delay "${CURL_RETRY_DELAY:-0}" \
+    --retry-max-time "${CURL_RETRY_MAX_TIME:-60}" \
+    --output - \
+    --url "https://get.helm.sh/helm-v${HELM_VERSION}-linux-amd64.tar.gz" | \
+    tar -zxf - --no-same-owner -C /usr/local/bin --strip-components=1 linux-amd64/helm && \
+    chmod 0755 /usr/local/bin/helm && \
+    ##################################################################
+    ### install gh
+    ##################################################################
+    curl --progress-bar --location --fail --show-error \
+    --connect-timeout "${CURL_CONNECTION_TIMEOUT:-20}" \
+    --retry "${CURL_RETRY:-5}" \
+    --retry-delay "${CURL_RETRY_DELAY:-0}" \
+    --retry-max-time "${CURL_RETRY_MAX_TIME:-60}" \
+    --output - \
+    --url "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" | \
+    tar -xzf - --no-same-owner -C /usr/local/bin --strip-components=2 gh_${GH_VERSION}_linux_amd64/bin/gh && \
+    chmod 0755 /usr/local/bin/gh && \
+    #################################################################
+    ## install kustomize
+    #################################################################
+    curl --progress-bar --location --fail --show-error \
+    --connect-timeout "${CURL_CONNECTION_TIMEOUT:-20}" \
+    --retry "${CURL_RETRY:-5}" \
+    --retry-delay "${CURL_RETRY_DELAY:-0}" \
+    --retry-max-time "${CURL_RETRY_MAX_TIME:-60}" \
+    --output - \
+    --url "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv${KUSTOMIZE_VERSION}/kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz" | \
+    tar -xzf - --no-same-owner -C /usr/local/bin kustomize && \
+    chmod 0755 /usr/local/bin/kustomize && \
+    #################################################################
+    ## install yq
+    #################################################################
+    curl --progress-bar --location --fail --show-error \
+    --connect-timeout "${CURL_CONNECTION_TIMEOUT:-20}" \
+    --retry "${CURL_RETRY:-5}" \
+    --retry-delay "${CURL_RETRY_DELAY:-0}" \
+    --retry-max-time "${CURL_RETRY_MAX_TIME:-60}" \
+    --output /usr/local/bin/yq \
+    --url "https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/yq_linux_amd64" && \
+    chmod 0755 /usr/local/bin/yq && \
+    #################################################################
+    ## install lombok
+    #################################################################
+    curl --progress-bar --location --fail --show-error \
+    --connect-timeout "${CURL_CONNECTION_TIMEOUT:-20}" \
+    --retry "${CURL_RETRY:-5}" \
+    --retry-delay "${CURL_RETRY_DELAY:-0}" \
+    --retry-max-time "${CURL_RETRY_MAX_TIME:-60}" \
+    --output /usr/local/lib/lombok.jar \
+    --url "https://projectlombok.org/downloads/lombok-${LOMBOK_VERSION}.jar" && \
+    #################################################################
+    ## install argocd-vault-plugin
+    #################################################################
+    curl --progress-bar --location --fail --show-error \
+    --connect-timeout "${CURL_CONNECTION_TIMEOUT:-20}" \
+    --retry "${CURL_RETRY:-5}" \
+    --retry-delay "${CURL_RETRY_DELAY:-0}" \
+    --retry-max-time "${CURL_RETRY_MAX_TIME:-60}" \
+    --output /usr/local/bin/argocd-vault-plugin \
+    --url "https://github.com/argoproj-labs/argocd-vault-plugin/releases/download/v${ARGOCD_VAULT_PLUGIN_VERSION}/argocd-vault-plugin_${ARGOCD_VAULT_PLUGIN_VERSION}_linux_amd64" && \
+    chmod 0755 /usr/local/bin/argocd-vault-plugin && \
+    #################################################################
+    ## install tkn
+    #################################################################
+    curl --progress-bar --location --fail --show-error \
+    --connect-timeout "${CURL_CONNECTION_TIMEOUT:-20}" \
+    --retry "${CURL_RETRY:-5}" \
+    --retry-delay "${CURL_RETRY_DELAY:-0}" \
+    --retry-max-time "${CURL_RETRY_MAX_TIME:-60}" \
+    --output - \
+    --url "https://github.com/tektoncd/cli/releases/download/v${TKNCLI_VERSION}/tkn_${TKNCLI_VERSION}_Linux_x86_64.tar.gz" | \
+    tar -xzf - --no-same-owner -C /usr/local/bin tkn && \
+    chmod 0755 /usr/local/bin/tkn && \
+    ##################################################################
+    ### install terraform
+    ##################################################################
+    curl --progress-bar --location --fail --show-error \
+    --connect-timeout "${CURL_CONNECTION_TIMEOUT:-20}" \
+    --retry "${CURL_RETRY:-5}" \
+    --retry-delay "${CURL_RETRY_DELAY:-0}" \
+    --retry-max-time "${CURL_RETRY_MAX_TIME:-60}" \
+    --output /tmp/terraform_${TERRAFORM_VER}_linux_amd64.zip \
+    --url "https://releases.hashicorp.com/terraform/${TERRAFORM_VER}/terraform_${TERRAFORM_VER}_linux_amd64.zip" && \
+    unzip /tmp/terraform_${TERRAFORM_VER}_linux_amd64.zip -d /usr/local/bin && \
+    chmod 0755 /usr/local/bin/terraform && \
+    rm -rf /tmp/terraform_${TERRAFORM_VER}_linux_amd64.zip && \
+    #################################################################
+    ## install vault
+    #################################################################
+    curl --progress-bar --location --fail --show-error \
+    --connect-timeout "${CURL_CONNECTION_TIMEOUT:-20}" \
+    --retry "${CURL_RETRY:-5}" \
+    --retry-delay "${CURL_RETRY_DELAY:-0}" \
+    --retry-max-time "${CURL_RETRY_MAX_TIME:-60}" \
+    --output /tmp/vault_${VAULT_VERSION}_linux_amd64.zip \
+    --url "https://releases.hashicorp.com/vault/${VAULT_VERSION}/vault_${VAULT_VERSION}_linux_amd64.zip" && \
+    unzip /tmp/vault_${VAULT_VERSION}_linux_amd64.zip -d /usr/local/bin/ && \
+    rm -rf /tmp/vault_${VAULT_VERSION}_linux_amd64.zip && \
+    chmod 0755 /usr/local/bin/vault && \
+    #################################################################
+    ## install rclone
+    #################################################################
+    curl --progress-bar --location --fail --show-error \
+    --connect-timeout "${CURL_CONNECTION_TIMEOUT:-20}" \
+    --retry "${CURL_RETRY:-5}" \
+    --retry-delay "${CURL_RETRY_DELAY:-0}" \
+    --retry-max-time "${CURL_RETRY_MAX_TIME:-60}" \
+    --output /tmp/rclone-v${RCLONE_VERSION}-linux-amd64.zip \
+    --url "https://github.com/rclone/rclone/releases/download/v${RCLONE_VERSION}/rclone-v${RCLONE_VERSION}-linux-amd64.zip" && \
+    unzip /tmp/rclone-v${RCLONE_VERSION}-linux-amd64.zip -d /tmp && \
+    mv /tmp/rclone-v${RCLONE_VERSION}-linux-amd64/rclone /usr/local/bin/rclone && \
+    chmod 0755 /usr/local/bin/rclone && \
+    rm -rf /tmp/rclone-v${RCLONE_VERSION}-linux-amd64.zip /tmp/rclone-v${RCLONE_VERSION}-linux-amd64 && \
+    mkdir -p ${HOME} && \
+    echo "[gcp]\ntype = google cloud storage" > ${HOME}/rclone.conf && \
+    #################################################################
+    # Rootless/unprivileged buildah configurations
+    #################################################################
+    # https://github.com/containers/buildah/blob/main/docs/tutorials/05-openshift-rootless-build.md
+    # https://github.com/containers/podman/blob/main/docs/tutorials/rootless_tutorial.md
+    # https://www.redhat.com/sysadmin/podman-inside-kubernetes
+    # https://www.redhat.com/sysadmin/podman-inside-container
+    # https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html-single/building_running_and_managing_containers/index#proc_upgrading-to-rootless-containers_assembly_starting-with-containers
+    # https://github.com/containers/buildah/issues/3726
+    # https://github.com/containers/podman/issues/4056#issuecomment-699629964
+    # https://www.redhat.com/sysadmin/podman-inside-kubernetes
+    # https://www.redhat.com/sysadmin/faster-container-image-pulls
+    # https://github.com/dragonflyoss/image-service
+    # https://medium.com/nttlabs/lazy-pulling-estargz-ef35812d73de
+    touch /etc/subgid /etc/subuid && \
+    chmod g=u /etc /etc/subgid /etc/subuid /etc/passwd && \
+    echo "${USER_NAME}:100000:65536" > /etc/subuid && \
+    echo "${USER_NAME}:100000:65536" > /etc/subgid && \
+    mkdir -p ${HOME}/.config/containers ${HOME}/.local/share/containers /etc/containers && \
+    curl -Lo /etc/containers/containers.conf https://raw.githubusercontent.com/containers/libpod/master/contrib/podmanimage/stable/containers.conf && \
+    #(echo '[engine]';echo 'cgroup_manager = "cgroupfs"') > /etc/containers/containers.conf && \
+    cp /etc/containers/storage.conf ${HOME}/.config/containers/storage.conf && \
+    sed -i -e 's|^#mount_program|mount_program|g' -e '/additionalimage.*/a "/var/lib/shared",' /etc/containers/storage.conf && \
+    #sed -i -e 's|^driver[[:space:]]*=.*$|driver = "vfs"|g' -e 's|^#mount_program|mount_program|g' -e '/additionalimage.*/a "/var/lib/shared",' -e 's|^runroot[[:space:]]*=.*$|runroot = "/var/tmp/user"|g' -e 's|^graphroot[[:space:]]*=.*$|graphroot = "/home/user/.local/share/containers/storage"|g' -e 's|^mountopt[[:space:]]*=.*$|mountopt = "nodev,fsync=0"|g' -e 's|^#ignore_chown_errors|ignore_chown_errors|g' -e 's|^ignore_chown_errors[[:space:]]*=.*$|ignore_chown_errors = "true"|g' ${HOME}/.config/containers/storage.conf && \
+    (echo '[storage]';echo 'driver = "vfs"') > ${HOME}/.config/containers/storage.conf && \
+    curl -Lo ${HOME}/.config/containers/containers.conf https://raw.githubusercontent.com/containers/libpod/master/contrib/podmanimage/stable/podman-containers.conf && \
+    #sed -i 's/short-name-mode="enforcing"/short-name-mode="permissive"/g' /etc/containers/registries.conf && \
+    mkdir -p /var/lib/shared/overlay-images /var/lib/shared/overlay-layers /var/lib/shared/vfs-images /var/lib/shared/vfs-layers && \
+    touch /var/lib/shared/overlay-images/images.lock && \
+    touch /var/lib/shared/overlay-layers/layers.lock && \
+    touch /var/lib/shared/vfs-images/images.lock && \
+    touch /var/lib/shared/vfs-layers/layers.lock && \
+    #chown -R user:0 /var/lib/shared && \
+    chmod 0644 /etc/containers/containers.conf && \
+    #ln -s /usr/local/bin/podman /usr/bin/docker && \
+    ##################################################################
+    # Install Powershell
+    ##################################################################
+    rpm -Uvh https://github.com/PowerShell/PowerShell/releases/download/v${PS_VERSION}/powershell-${PS_VERSION}-1.rh.x86_64.rpm && \
+    mkdir -p ${HOME}/.local/share/powershell/PSReadLine && \
+    ##################################################################
+    # Install Roboconfig
+    ##################################################################
+    # pwsh -f /roboconfig/bootstrap.ps1 -RoboConfigDestination /roboconfig -ZipLocation "https://www.gsoutils.ford.com/powershell/api/v2/package/roboconfig/${ROBOCONFIG_VERSION}" && \
+    ##################################################################
+    # configure python
+    ##################################################################
+    # pip install --install-option="--prefix=$HOME/local" pydoc yq
+    ##################################################################
+    # Install rust
+    ##################################################################
+    curl --proto '=https' --tlsv1.2 -sSfo rustup https://sh.rustup.rs && \
+    chmod +x rustup && \
+    mv rustup /usr/bin/ && \
+    rustup -y --no-modify-path --profile minimal -c rust-src -c rust-analysis -c rls && \
+    ##################################################################
+    # Install go
+    ##################################################################
+    curl --progress-bar --location --fail --show-error \
+    --connect-timeout "${CURL_CONNECTION_TIMEOUT:-20}" \
+    --retry "${CURL_RETRY:-5}" \
+    --retry-delay "${CURL_RETRY_DELAY:-0}" \
+    --retry-max-time "${CURL_RETRY_MAX_TIME:-60}" \
+    --output /tmp/go${GO_VERSION}.linux-amd64.tar.gz \
+    --url "https://golang.org/dl/go${GO_VERSION}.linux-amd64.tar.gz" && \
+    echo "${GO_SHA256SUM} /tmp/go${GO_VERSION}.linux-amd64.tar.gz" | sha256sum -c - && \
+    tar -xzf /tmp/go${GO_VERSION}.linux-amd64.tar.gz --no-same-owner -C /usr/local && \
+    rm -rf /tmp/go${GO_VERSION}.linux-amd64.tar.gz && \
+    mkdir -p /projects/.che/gopath /.cache ${HOME}/go && \
+    ##################################################################
+    # e2fsprogs, required for intellij support
+    # https://github.com/eclipse/che/issues/21007
+    # https://github.com/devfile/developer-images/pull/25
+    ##################################################################
+    curl --progress-bar --location --fail --show-error \
+    --connect-timeout "${CURL_CONNECTION_TIMEOUT:-20}" \
+    --retry "${CURL_RETRY:-5}" \
+    --retry-delay "${CURL_RETRY_DELAY:-0}" \
+    --retry-max-time "${CURL_RETRY_MAX_TIME:-60}" \
+    --output - \
+    --url "https://mirrors.edge.kernel.org/pub/linux/kernel/people/tytso/e2fsprogs/v${E2FSPROGS_VERSION}/e2fsprogs-${E2FSPROGS_VERSION}.tar.gz" | \
+    tar -xzf - --no-same-owner -C /tmp && \
+    cd "/tmp/e2fsprogs-${E2FSPROGS_VERSION}" && \
+    mkdir build && \
+    cd build && \
+    ../configure --prefix=/usr --with-root-prefix="" --enable-elf-shlibs && \
+    make && \
+    make install && \
+    make install-libs && \
+    cd -- && \
+    rm -rf "/tmp/e2fsprogs-${E2FSPROGS_VERSION}" && \
+    #################################################################
+    # home directory permissions
+    #################################################################
+    chown -R ${USER_UID}:0 ${HOME} && \
+    chgrp -R 0 ${HOME} && \
+    chmod -R 0775 ${HOME} && \
+    #################################################################
+    # Cleanup packages
+    #################################################################
+    if [ "${BUILDTIME_PKGS}" != "" ]; then \
+    ${PKGMGR} remove -y ${BUILDTIME_PKGS} && \
+    ${PKGMGR} clean all -y --enablerepo='*' \
+    ;fi && \
+    ${PKGMGR} clean all -y --enablerepo='*' && \
+    rm -rf /{root,tmp,var/cache/{ldconfig,yum}}/* && \
+    rm -rf /var/cache/* /var/log/dnf* /var/log/yum.* && \
+    #################################################################
+    # Set permissions on /etc/passwd and /home to allow arbitrary users to write
+    #################################################################
+    echo "/usr/local/lib64" > /etc/ld.so.conf.d/openssl.conf && \
+    ldconfig && \
+    mkdir -p ${HOME} && \
+    # Copy the global git configuration to user config as global /etc/gitconfig
+    # file may be overwritten by a mounted file at runtime
+    cp /etc/gitconfig ${HOME}/.gitconfig && \
+    chgrp -R 0 /home && \
+    chown -R ${USER_UID}:0 ${HOME} && \
+    chmod -R 0775 ${HOME} && \
+    chmod -R g=u /etc/passwd /etc/group /home && \
+    chmod 0775 /entrypoint.sh && \
+    chown ${USER_UID}:0 /entrypoint.sh
+
+USER 1001
+
+# install krew plugin
+RUN set -ex && \
+    kubectl krew install slice && \
+    kubectl krew install neat && \
+    kubectl krew install ns && \
+    kubectl krew install ctx
+
+# Java
+## sdk install java 8.0.332-tem
+RUN set -ex && \
+    curl -fsSL "https://get.sdkman.io" | bash && \
+    bash -c ". ${HOME}/.sdkman/bin/sdkman-init.sh && \
+    sed -i "s/sdkman_auto_answer=false/sdkman_auto_answer=true/g" ${HOME}/.sdkman/etc/config && \
+    sdk install java 8.0.332-tem && \
+    sdk install java 11.0.15-tem && \
+    sdk install java 17.0.3-tem && \
+    sdk install java 22.1.0.0.r17-mandrel && \
+    sdk default java 11.0.15-tem && \
+    sdk install gradle && \
+    sdk install maven && \
+    sdk install jbang && \
+    sdk flush archives && \
+    sdk flush temp"
+
+# sdk home java <version>
+ENV \
+    JAVA_HOME_8=/home/user/.sdkman/candidates/java/8.0.332-tem \
+    JAVA_HOME_11=/home/user/.sdkman/candidates/java/11.0.15-tem \
+    JAVA_HOME_17=/home/user/.sdkman/candidates/java/17.0.3-tem \
+    # Java-related environment variables are described and set by /home/user/.bashrc
+    # To make Java working for dash and other shells, it needs to initialize them in the Dockerfile.
+    SDKMAN_CANDIDATES_API="https://api.sdkman.io/2" \
+    SDKMAN_CANDIDATES_DIR="/home/user/.sdkman/candidates" \
+    SDKMAN_DIR="/home/user/.sdkman" \
+    SDKMAN_PLATFORM="linuxx64" \
+    SDKMAN_VERSION="5.15.0" \
+    GRADLE_HOME="/home/user/.sdkman/candidates/gradle/current" \
+    JAVA_HOME="/home/user/.sdkman/candidates/java/current" \
+    MAVEN_HOME="/home/user/.sdkman/candidates/maven/current" \
+    GRAALVM_HOME=/home/user/.sdkman/candidates/java/22.1.0.0.r17-mandrel \
+    PATH="/home/user/.sdkman/candidates/maven/current/bin:$PATH" \
+    PATH="/home/user/.sdkman/candidates/java/current/bin:$PATH" \
+    PATH="/home/user/.sdkman/candidates/gradle/current/bin:$PATH" \
+    PATH="/home/user/.local/share/coursier/bin:$PATH"
+
+# NodeJS
+ENV \
+    NVM_DIR="/home/user/.nvm" \
+    NODEJS_VERSION=18.4.0 \
+    NODEJS_12_VERSION=12.22.12 \
+    NODEJS_14_VERSION=14.19.3 \
+    NODEJS_16_VERSION=16.15.1
+
+
+RUN set -ex && \
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v${NVM_VERSION}/install.sh | bash && \
+    source /home/user/.bashrc && \
+    nvm install v${NODEJS_VERSION} && \
+    nvm install v${NODEJS_16_VERSION} && \
+    nvm install v${NODEJS_14_VERSION} && \
+    nvm install v${NODEJS_12_VERSION} && \
+    nvm alias default v${NODEJS_VERSION} && \
+    nvm use v${NODEJS_VERSION} && \
+    npm install --global yarn@v1.22.19
+
+ENV \
+    PATH=$NVM_DIR/versions/node/v$NODEJS_VERSION/bin:$PATH \
+    NODEJS_HOME_12=$NVM_DIR/versions/node/v$NODEJS_12_VERSION \
+    NODEJS_HOME_14=$NVM_DIR/versions/node/v$NODEJS_14_VERSION \
+    NODEJS_HOME_16=$NVM_DIR/versions/node/v$NODEJS_16_VERSION \
+    NODEJS_HOME_18=$NVM_DIR/versions/node/v$NODEJS_VERSION
+
+# vscode go extension dependencies
+ENV \
+    PATH=/home/user/go/bin:/usr/local/go/bin:$PATH
+
+# https://github.com/GoogleContainerTools/container-debug-support/blob/duct-tape/go/helper-image/Dockerfile#L26
+# https://github.com/devfile/developer-images/blob/main/universal/ubi8/Dockerfile#L99
+RUN set -ex && \
+    GO111MODULE=on go install golang.org/x/tools/gopls@latest && \
+    go install -v github.com/mdempsky/gocode@latest && \
+    go install -v github.com/uudashr/gopkgs/v2/cmd/gopkgs@latest && \
+    go install -v github.com/ramya-rao-a/go-outline@latest && \
+    go install -v github.com/acroca/go-symbols@latest && \
+    go install -v golang.org/x/tools/cmd/guru@latest && \
+    go install -v golang.org/x/tools/cmd/gorename@latest && \
+    go install -v github.com/cweill/gotests/...@latest && \
+    go install -v github.com/fatih/gomodifytags@latest && \
+    go install -v github.com/josharian/impl@latest && \
+    go install -v github.com/davidrjenni/reftools/cmd/fillstruct@latest && \
+    go install -v github.com/haya14busa/goplay/cmd/goplay@latest && \
+    go install -v github.com/godoctor/godoctor@latest && \
+    go install -v github.com/go-delve/delve/cmd/dlv@latest && \
+    go install -v github.com/stamblerre/gocode@latest && \
+    go install -v github.com/rogpeppe/godef@latest && \
+    go install -v golang.org/x/lint/golint@latest && \
+    go install -v honnef.co/go/tools/cmd/staticcheck@latest
+#GOBIN=/tmp/ go install github.com/go-delve/delve/cmd/dlv@master && \
+#mv /tmp/dlv ${HOME}/go/bin/dlv-dap
+
+# Set permissions on /etc/passwd and /home to allow arbitrary users to write
+#RUN set -ex && \
+#    mkdir -p ${HOME} && \
+#    chgrp -R 0 /home && \
+#    chmod -R g=u /etc/passwd /etc/group /home
+
+WORKDIR /projects
+
+ENTRYPOINT ["/entrypoint.sh"]
+
+CMD ["tail", "-f", "/dev/null"]

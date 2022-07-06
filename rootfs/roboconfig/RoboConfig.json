@@ -1,0 +1,36 @@
+{
+    "global": {
+        "description": "Powershell Container image with core tools installed",
+        "PrivateRepoName": "private-repo",
+        "PrivateRepoSourceLocation": "https://www.gsoutils.ford.com/powershell/nuget"
+    },
+    "tasks": [
+        {
+            "name": "Config PowerShell Repository",
+            "commands": [
+                "Unregister-PSRepository $PrivateRepoName -ErrorAction SilentlyContinue",
+                "Register-PSRepository -Name $PrivateRepoName -SourceLocation $PrivateRepoSourceLocation -InstallationPolicy 'Trusted'"
+            ]
+        },
+        {
+            "name": "Install Modules",
+            "runAfter": "Config PowerShell Repo",
+            "modules": [
+                {
+                    "Name": "powershell-yaml",
+                    "AllowClobber": true,
+                    "SkipPublisherCheck": true,
+                    "Version": "0.4.2",
+                    "Scope": "AllUsers"
+                },
+                {
+                    "Name": "RoboBuild",
+                    "AllowClobber": true,
+                    "SkipPublisherCheck": true,
+                    "Version": "0.2.3",
+                    "Scope": "AllUsers"
+                }
+            ]
+        }
+    ]
+}

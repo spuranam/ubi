@@ -1,0 +1,35 @@
+[centos-9-baseos]
+name=CentOS Stream 9 - BaseOS
+baseurl=http://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-Official
+gpgcheck=1
+repo_gpgcheck=0
+metadata_expire=6h
+countme=1
+enabled=0
+
+[centos-9-appstream]
+name=CentOS Stream 9 - AppStream
+#https://ord.mirror.rackspace.com/centos-stream/9-stream/AppStream/$arch/os
+baseurl=http://mirror.stream.centos.org/9-stream/AppStream/x86_64/os
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-Official
+gpgcheck=1
+repo_gpgcheck=0
+metadata_expire=6h
+countme=1
+enabled=0
+
+[epel]
+name=Extra Packages for Enterprise Linux $releasever - $basearch
+baseurl=https://download-ib01.fedoraproject.org/pub/epel/9/Everything/$arch
+enabled=0
+gpgcheck=1
+countme=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-9
+
+## https://github.com/dralley/rpmrepo_metadata/blob/master/tests/assets/download_external_repos.sh
+## https://github.com/rocky-linux/sig-core-toolkit/tree/main/iso/empanadas/images
+## https://github.com/rocky-linux/peridot-base-images/blob/main/build/rhel.repo
+## https://github.com/projectcalico/calico/blob/master/node/Dockerfile.amd64
+## https://github.com/pkeech/ubi-podman-oscap-minimal/blob/main/src/custom.repo
+## https://github.com/zombiemaker/aci-aws_client-ubi/blob/master/Dockerfile

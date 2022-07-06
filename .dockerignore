@@ -1,0 +1,12 @@
+.DS_Store
+**/.DS_Store
+**/misc/*
+*.md
+*.yaml
+build.sh
+test.sh
+container-structure-test.yaml
+refs.md
+*.tar
+**/refs/*
+Dockerfile.min
